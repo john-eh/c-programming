@@ -6,7 +6,7 @@
 #include <sys/sysinfo.h>
 #include "graphics.h"
 
-typedef struct c {
+typedef struct thread_data {
 	struct quad_node * head	;
 	double * force_x;
 	double * force_y;	
@@ -243,16 +243,16 @@ double new_particle_x, double new_particle_y, double new_particle_mass, int new_
 
 		if (old_particle_pos == 0){
  			current->ne = insert(current->ne, 	x_center + 0.5*height, 	y_center + 0.5*height, 	0.5 * height, 
- 												current->particle_x, current->particle_y, current->particle_mass, current->index);
+ 											current->particle_x, current->particle_y, current->particle_mass, current->index);
  		} else if (old_particle_pos == 1){
  			current->nw = insert(current->nw,  	x_center - 0.5*height, 	y_center + 0.5*height, 	0.5 * height, 
- 												current->particle_x, current->particle_y, current->particle_mass, current->index);
+ 											current->particle_x, current->particle_y, current->particle_mass, current->index);
  		} else if (old_particle_pos == 2){
  			current->se = insert(current->se,  	x_center + 0.5*height, 	y_center - 0.5*height, 	0.5 * height, 
- 												current->particle_x, current->particle_y, current->particle_mass, current->index);
+ 											current->particle_x, current->particle_y, current->particle_mass, current->index);
 		}  else if (old_particle_pos == 3){
  			current->sw = insert(current->sw, 	x_center - 0.5*height, 	y_center - 0.5*height, 	0.5 * height, 
- 												current->particle_x, current->particle_y, current->particle_mass, current->index);
+ 											current->particle_x, current->particle_y, current->particle_mass, current->index);
 		}
 		(current)->particle_no +=1;
  		return current;
@@ -598,7 +598,7 @@ int main(int argc, char const *argv[]){
 		threadNo = atoi(argv[7]);
     } else{ 
    		double a = noOfParticles; double b = get_nprocs();
-  		if ( ceil(a/b) == floor(a/b)		) {
+  		if ( ceil(a/b) == floor(a/b)	) {
   	  		threadNo =  get_nprocs();
   	  	} else {
 			threadNo =  1;
