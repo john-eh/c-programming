@@ -17,25 +17,24 @@ double vecVecMultiplication(double* vecA, double* vecB, int size, int threadNo, 
 
 	#pragma omp parallel num_threads(threadNo)
   	{
-  		if (avx_enable){ 	
+  		if (avx_enable){
   		#pragma  omp for schedule(dynamic,stride) reduction(+: sum)
 			for (i = 0; i < size; i+= 4) {
 
 				/* Vector instructions to multiply and decrease two vectors down to one value */
 				__m256d va  = _mm256_loadu_pd(  (vecA + i) );
-				__m256d vb  = _mm256_loadu_pd(  (vecB + i) );		
+				__m256d vb  = _mm256_loadu_pd(  (vecB + i) );
 				__m256d add = _mm256_mul_pd (va,  vb);
 
 				__m256d t1 = _mm256_hadd_pd(add,add);
 				__m128d t3 = _mm256_extractf128_pd(t1,1);
 				__m128d t4 = _mm_add_sd(_mm256_castpd256_pd128(t1),t3);
-				    
-				sum += _mm_cvtsd_f64(t4);   
-	    	} 
+				sum += _mm_cvtsd_f64(t4);
+	    	}
 	   } else {
 	    #pragma  omp for schedule(dynamic,stride) reduction(+: sum)
 	    	for (i = 0; i < size; i++) {
-	    		sum += (vecA[i] * vecB[i]);   
+	    		sum += (vecA[i] * vecB[i]);
 	    	}
   	}
 
@@ -81,28 +80,28 @@ void vecMatMultiplication(double** matrix, double* p, double * result, int size,
 
 					/* Vector instructions to multiply and decrease two vectors down to one value */
 					__m256d va =  _mm256_loadu_pd(  (matrix[i] + j) );
-					__m256d vb =  _mm256_loadu_pd(  (p+j) );		
+					__m256d vb =  _mm256_loadu_pd(  (p+j) );
 					__m256d vadd = _mm256_mul_pd (va,  vb);
-		
+
 					__m256d v1 = _mm256_hadd_pd(vadd,vadd);
 				    __m128d v2 = _mm256_extractf128_pd(v1,1);
 				    __m128d v3 = _mm_add_sd(_mm256_castpd256_pd128(v1),v2);
-				    
-				    result[i] += _mm_cvtsd_f64(v3);   				
+
+				    result[i] += _mm_cvtsd_f64(v3);
 				}
 			} else {
 				result[i] = 0.0;
 				for (j = 0; j < size; j++ ) {
-			    	result[i] += matrix[i][j]* p[j];   				
-				}			
+			    	result[i] += matrix[i][j]* p[j];
+				}
 			}
 		}
 }
 
 void copyVector(double* a, const double* b, int size, int avx_enable, int nThreads) {
-/* Copies content of one vector to another using parallel for 
+/* Copies content of one vector to another using parallel for
  * a = vector copied to
- * b = vector copied from 
+ * b = vector copied from
 */
 	int i;
 	if (avx_enable){
@@ -110,7 +109,7 @@ void copyVector(double* a, const double* b, int size, int avx_enable, int nThrea
 		for (i = 0; i < size; i+= 4 ) {
        		__m256d v =  _mm256_loadu_pd(  (b+i) );
 			_mm256_storeu_pd(  (a+i), v );
-				
+
 		}
   } else {
   		#pragma  omp parallel for schedule(dynamic,stride) num_threads(nThreads)
@@ -143,7 +142,7 @@ int read_from_file(double ** matrix, double *b, int size, const char * title){
 }
 
 void save_to_file( double * xvector, int size, int debug){
-	
+
 	FILE * fp;
 	if (debug){
 		fp = fopen("results.txt", "w+");
@@ -160,7 +159,7 @@ void save_to_file( double * xvector, int size, int debug){
 
 
 int main(int argc, char **argv) {
-  
+
   	int      i, k, size, max_iterations, nThreads;
   	double	 val_a, val_b, tolerance;
 
@@ -255,7 +254,7 @@ int main(int argc, char **argv) {
 	double* p_old = malloc(size * sizeof(double));
 	double* r = malloc(size * sizeof(double));
 	double* r_old = malloc(size * sizeof(double));
-	  
+
 	/* With a starting guess of x = 0 we get starting value for r as r = b */
 	memset(x,0,size);
 	memcpy(r, b, (size * sizeof(double)));
@@ -269,43 +268,44 @@ int main(int argc, char **argv) {
 		k++;
 
 		/* Updating values of array */
-	    #pragma omp parallel default(none) shared( r, r_old , p, p_old, x, x_old, size, avx_enable, nThreads) 
-	    #pragma omp single 
-	    {
-	   	#pragma omp task
-	    	copyVector(r_old, r, size, avx_enable, nThreads/3);
-	    #pragma omp task
-	       	copyVector(p_old, p, size, avx_enable, nThreads/3);
-		#pragma omp task
-	      	copyVector(x_old, x, size, avx_enable, nThreads/3);
-	    #pragma omp taskwait
+
+		#pragma omp parallel default(none) shared( r, r_old , p, p_old, x, x_old, size, avx_enable, nThreads) 
+	    	#pragma omp single
+	    	{
+	 	#pragma omp task
+	    		copyVector(r_old, r, size, avx_enable, nThreads/3);
+	    	#pragma omp task
+	       		copyVector(p_old, p, size, avx_enable, nThreads/3);
+	    	#pragma omp task
+	      		copyVector(x_old, x, size, avx_enable, nThreads/3);
+	    	#pragma omp taskwait
 	   	}
-   	
+
    		/* Matrix computation for computing alpha */
 		vecMatMultiplication( matrix, p, Ap, size, nThreads, avx_enable);
-  
-		double d1,d2;	
-		#pragma omp parallel default(none) shared(  r , p, Ap, size, d1,d2, nThreads, avx_enable) 	
-    	#pragma omp single 
-    	{
-        #pragma omp task
-         	d1 = vecVecMultiplication(r, r, size, nThreads/2, avx_enable);
-        #pragma omp task
-         	d2 = vecVecMultiplication(p, Ap, size, nThreads/2, avx_enable);
-        #pragma omp taskwait
-   		 }	
+
+		double d1,d2;
+		#pragma omp parallel default(none) shared(  r , p, Ap, size, d1,d2, nThreads, avx_enable)
+    		#pragma omp single
+    		{
+        	#pragma omp task
+         		d1 = vecVecMultiplication(r, r, size, nThreads/2, avx_enable);
+        	#pragma omp task
+         		d2 = vecVecMultiplication(p, Ap, size, nThreads/2, avx_enable);
+        	#pragma omp taskwait
+   		}
 
 	 	alpha = d1/d2;
 
 	 	/* Updates x_k+1 and r_k+1 */
 	 	vecScalarMultiplication(x_old, p, x, alpha, size, nThreads, avx_enable);
 	 	vecScalarMultiplication(r_old, Ap, r, -alpha, size, nThreads, avx_enable);
-			  	  		  
+
 		/* If residue vector r is now small enough we exit the loop */
-	    test = vecVecMultiplication(r, r, size, nThreads, avx_enable);
-	    if (test < tolerance){
-	    	break;
-	    }
+	    	test = vecVecMultiplication(r, r, size, nThreads, avx_enable);
+	    	if (test < tolerance){
+	    		break;
+	    	}
 
 
 	  	/* Beta is calculated as (rT*r)/(r_oldT*r_old) */
@@ -314,10 +314,10 @@ int main(int argc, char **argv) {
    		#pragma omp single 
    		{
    		#pragma omp task
-       		c1 = vecVecMultiplication(r, r, size, nThreads/2, avx_enable);
-       	#pragma omp task
-       		c2 = vecVecMultiplication(r_old, r_old, size, nThreads/2, avx_enable);
-       	#pragma omp taskwait
+       			c1 = vecVecMultiplication(r, r, size, nThreads/2, avx_enable);
+       		#pragma omp task
+       			c2 = vecVecMultiplication(r_old, r_old, size, nThreads/2, avx_enable);
+       		#pragma omp taskwait
 		}
 
 		beta = c1/c2;
@@ -345,6 +345,6 @@ int main(int argc, char **argv) {
 	free(x_old);
 	free(p_old);
 	free(r_old);
-  
+
   return 0;
 }
